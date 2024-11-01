@@ -6,14 +6,12 @@ class MAA2Crunner:
         self.env = env
         self.num_agents = num_agents
         
-    def run_experiment(self, veh_pos_data, test_data_list, env_setup):
+    def run_experiment(self):
         params = MAA2Cparameters()
 
         train_params = {
-            'env_setup': env_setup,
-            'test_data_list': test_data_list,
-            'veh_pos_data': veh_pos_data,
             'state_dim': self.env.stateDim,
+            'observation_dim': self.local_stateDim,
             'action_dim': self.env.actionDim,
             'num_agents': self.num_agents,
             'gamma': params.gamma,
