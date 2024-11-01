@@ -37,8 +37,9 @@ def main():
     # Create the environment
     # You can set environment hyperparameters here
     # More environements can be added here
+    env = Environ()
     if args.env == 'HCRA': # Non Partial Observable
-        env = create_hcra()
+        env = env.create_hcra()
         env_name = 'HCRA'
 
         # Create the runner
@@ -55,7 +56,7 @@ def main():
             raise ValueError("Algorithm name incorrect or not found")
         
     elif args.env == 'HCRAPO': # Partial Observable
-        env = create_hcra_po()
+        env = env.create_hcrapo()
         env_name == "HCRAPO"
 
         # Create the runner
