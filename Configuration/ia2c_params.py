@@ -4,7 +4,7 @@ class IA2Cparameters:
     def __init__(self):
 
         self.num_trials = 5
-        self.training_value = 100000
+        self.training_episodes = 100000
         self.batch_size = 8
         self.alpha = 0.0001
         self.beta = 0.0001
@@ -16,5 +16,5 @@ class IA2Cparameters:
         self.t_max = 10
         self.tau = 0.01
         self.test_interval = 1000
-        self.num_training_episodes = math.ceil(self.training_value / self.batch_size)
+        self.num_training_iteration = math.ceil(self.training_episodes / self.batch_size)
         self.num_test_episodes = 10

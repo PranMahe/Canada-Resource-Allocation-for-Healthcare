@@ -1,19 +1,17 @@
-from Configuration.ia2c_params import IA2Cparameters
-from Trainers.ia2c_trainer import IA2CtrainerPS
+from Configuration.maa2c_params import MAA2Cparameters
+from Trainers.maa2c_trainer_po import MAA2CtrainerPO
 
-class IA2Crunner:
-    def __init__(self, env, env_name):
+class MAA2CrunnerPO:
+    def __init__(self, env, num_agents):
         self.env = env
-        self.env_name = env_name
+        self.num_agents = num_agents
         
     def run_experiment(self):
-        params = IA2Cparameters()
+        params = MAA2Cparameters()
 
         train_params = {
-            'env': self.env,
-            'env_name': self.env_name,
             'state_dim': self.env.stateDim,
-            'observation_dim': self.env.local_stateDim,
+            'observation_dim': self.local_stateDim,
             'action_dim': self.env.actionDim,
             'num_agents': self.num_agents,
             'gamma': params.gamma,
@@ -25,12 +23,12 @@ class IA2Crunner:
             'reward_standardization': params.reward_standardization,
             't_max': params.t_max,
             'tau': params.tau,
-            'test_interval': params.test_interval,
+            'test_interval':params.test_interval,
             'num_training_iteration': params.num_training_iteration,
             'num_test_episodes': params.num_test_episodes,
-            'batch_size': params.batch_size
+            'batch_size': params.num_batch_episodes,
         }
 
         for trial in range(params.num_trials):
             print(f"Trial: {trial+1}")
-            train_rewards, test_rewards = IA2CtrainerPS.train_IA2C_ParameterSharing(trial, **train_params)
+            train_rewards, test_rewards = MAA2CtrainerPO.train_MAA2C_ParameterSharing(trial, **train_params)

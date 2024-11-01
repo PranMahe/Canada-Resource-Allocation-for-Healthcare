@@ -1,7 +1,7 @@
 from Configuration.ia2c_params import IA2Cparameters
-from Trainers.ia2c_trainer import IA2CtrainerPS
+from Trainers.ia2c_trainer_po import IA2CtrainerPO
 
-class IA2Crunner:
+class IA2CrunnerPO:
     def __init__(self, env, env_name):
         self.env = env
         self.env_name = env_name
@@ -33,4 +33,4 @@ class IA2Crunner:
 
         for trial in range(params.num_trials):
             print(f"Trial: {trial+1}")
-            train_rewards, test_rewards = IA2CtrainerPS.train_IA2C_ParameterSharing(trial, **train_params)
+            train_rewards, test_rewards = IA2CtrainerPO.train_IA2C_ParameterSharing(trial, **train_params)
