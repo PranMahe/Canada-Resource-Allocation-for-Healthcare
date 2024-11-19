@@ -30,7 +30,7 @@ NOTE:
 
 def main():
     parser = argparse.ArgumentParser(description="Run different variations of algorithms and environments.")
-    parser.add_argument('--env', type=str, required=True, help='The environment to run. Choose from "HCRA", "HCRAPO".')
+    parser.add_argument('--env', type=str, required=True, help='The environment to run. Choose from "HCRA".')
     parser.add_argument('--algo', type=str, required=True, help='The algorithm to use. Choose from "maa2c", "ia2c", "mappo", or "ippo".')
     args = parser.parse_args()
 
@@ -38,26 +38,10 @@ def main():
     # You can set environment hyperparameters here
     # More environements can be added here
     env = Environ()
-    if args.env == 'HCRA': # Non Partial Observable
-        env = env.create_hcra()
-        env_name = 'HCRA'
-
-        # Create the runner
-        # More runners can be added here
-        if args.algo == 'ia2c':
-            runner = IA2Crunner(env, env_name)
-        elif args.algo == 'maa2c':
-            runner = MAA2Crunner(env, env_name)
-        elif args.algo == 'ippo':
-            runner = IPPOrunner(env, env_name)
-        elif args.algo == 'mappo':
-            runner = MAPPOrunner(env, env_name)
-        else:
-            raise ValueError("Algorithm name incorrect or not found")
         
-    elif args.env == 'HCRAPO': # Partial Observable
-        env = env.create_hcrapo()
-        env_name == "HCRAPO"
+    if args.env == 'HCRA': # Partial Observable
+        env = env.create_hcra()
+        env_name = "HCRA"
 
         # Create the runner
         # More runners can be added here
