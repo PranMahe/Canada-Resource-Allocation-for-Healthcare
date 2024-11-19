@@ -5,8 +5,8 @@ from torch.distributions import Categorical
 import csv
 import matplotlib.pyplot as plt
 
-from Networks.Actors.RNN.ia2c_actor_gru import SharedA2CActor
-from Networks.Critics.RNN.ia2c_critic_gru import SharedA2CCritic
+from Networks.Actors.ia2c_actor_gru import SharedA2CActor
+from Networks.Critics.ia2c_critic_gru import SharedA2CCritic
 
 from Helpers.A2C.a2c_helper import BatchTraining
 from Benchmarkers.ia2c_test import IA2CtesterPS
