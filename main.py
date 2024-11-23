@@ -4,16 +4,9 @@ import argparse
 # from envs.matrixgame import create_climbing_game, create_penalty_game, create_tnt_game
 # from envs.matrixgame import *
 from Envs.Environment import *
-from Runners.ia2c_runner import IA2Crunner
 from Runners.ia2c_runner_po import IA2CrunnerPO
-
-from Runners.maa2c_runner import MAA2Crunner
 from Runners.maa2c_runner_po import MAA2CrunnerPO
-
-from Runners.ippo_runner import IPPOrunner
 from Runners.ippo_runner_po import IPPOrunnerPO
-
-from Runners.mappo_runner import MAPPOrunner
 from Runners.mappo_runner_po import MAPPOrunnerPO
 
 '''

@@ -1,5 +1,5 @@
 from Configuration.mappo_params import MAPPOparameters
-from Trainers import MAPPO_Trainer_PO
+from Trainers import mappo_trainer_po
 
 class MAPPOrunnerPO:
     def __init__(self, env, num_agents):
@@ -32,7 +32,7 @@ class MAPPOrunnerPO:
             'batch_size': params.batch_size,
         }
          
-        mappo_trainer = MAPPO_Trainer_PO()
+        mappo_trainer = mappo_trainer_po()  
 
         for trial in range(params.num_trials):
             print(f"Trial: {trial+1}")

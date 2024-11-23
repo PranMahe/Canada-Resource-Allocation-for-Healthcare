@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 from Networks.Actors.ia2c_actor_gru import SharedA2CActor
 from Networks.Critics.ia2c_critic_gru import SharedA2CCritic
 
-from Helpers.A2C.a2c_helper import BatchTraining
-from Benchmarkers.ia2c_test import IA2CtesterPS
+from Helpers.A2C.ia2c_helper import BatchTraining
+from Benchmarkers.ia2c_test_po import IA2CtesterPS
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -19,7 +19,7 @@ class IA2CtrainerPO:
                                     value_dim, alpha, beta, reward_standardization, num_batch_episodes, t_max, tau,
                                     test_interval, num_training_episodes, num_test_episodes): 
         
-        csv_file = open(f'IA2C_trial_{trial_run}_HCRAPO.csv', 'a', newline='')
+        csv_file = open(f'IA2C_trial_{trial_run}_HCRA.csv', 'a', newline='')
         csv_writer = csv.writer(csv_file)
 
         actor_shared = SharedA2CActor(state_dim, action_dim, actor_hidden_dim, num_agents).to(device)
@@ -50,7 +50,7 @@ class IA2CtrainerPO:
                     observations = []
 
                     for a in range(num_agents):
-                        observation = env.get_observation([a, 0], 0, t)
+                        observation = env.get_observation(a, t)
                         observation = th.tensor(observation, dtype=th.float32).to(device)
                         observations.append(observation.squeeze())
                         agent_id = th.nn.functional.one_hot(th.tensor(a), num_classes=num_agents).float().unsqueeze(0).to(device)
@@ -65,10 +65,10 @@ class IA2CtrainerPO:
                         prev_actions[a] = th.nn.functional.one_hot(th.tensor(action_idx), num_classes=action_dim).float().unsqueeze(0).to(device)
                         actions.append(action_idx)
                     # Execute actions in the environment
-                    global_reward, reward, done = env.step(action)
+                    global_reward, individual_rewards, done = env.step(actions)
                     
                     for a in range(num_agents):
-                        next_observation = env.get_observation([a, 0], 0, t + 1)
+                        next_observation = env.get_observation(a, t + 1)
                         next_observation = th.tensor(next_observation, dtype=th.float32).squeeze().to(device)
 
                     buffer['observations'].append(observations)
