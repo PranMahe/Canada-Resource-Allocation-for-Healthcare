@@ -24,7 +24,7 @@ class MAPPOrunnerPO:
             'eps_clip': params.eps_clip,
             'num_mini_batches': params.num_mini_batches,
             'epochs': params.epochs,
-            't_max': params.t_max,
+            't_max': self.env.t_max,
             'test_interval': params.test_interval,
             'num_training_iteration': params.num_training_iteration,
             'num_test_episodes': params.num_test_episodes,

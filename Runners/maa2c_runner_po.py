@@ -21,7 +21,7 @@ class MAA2CrunnerPO:
             'alpha': params.alpha,
             'beta': params.beta,
             'reward_standardization': params.reward_standardization,
-            't_max': params.t_max,
+            't_max': self.env.t_max,
             'tau': params.tau,
             'test_interval':params.test_interval,
             'num_training_iteration': params.num_training_iteration,

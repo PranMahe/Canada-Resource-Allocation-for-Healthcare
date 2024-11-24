@@ -166,7 +166,7 @@ class MAPPO_Trainer:
 
                 if (episode) % test_interval == 0:
                     actor_shared.eval()
-                    test_reward = MAPPOtester.test_MAPPO(actor_shared, num_test_episodes, num_agents, actor_hidden_dim, action_dim)
+                    test_reward = MAPPOtester.test_MAPPO(env, actor_shared, num_test_episodes, num_agents, t_max, actor_hidden_dim, action_dim)
                     test_rewards.append(test_reward)
                     csv_writer.writerow([test_reward])
                     csv_file.flush()

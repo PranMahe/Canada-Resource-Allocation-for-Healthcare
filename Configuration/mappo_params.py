@@ -12,7 +12,7 @@ class MAPPOparameters:
         self.critic_hidden_dim = 128
         self.gamma = 0.99
         self.value_dim = 1
-        self.t_max = 10
+        #self.t_max = 10
         self.tau = 0.01
         self.entropy_coef = 0.01
         self.eps_clip = 0.2

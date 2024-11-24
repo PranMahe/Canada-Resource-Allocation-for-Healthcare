@@ -13,7 +13,7 @@ class MAA2Cparameters:
         self.gamma = 0.99
         self.value_dim = 1
         self.reward_standardization = False
-        self.t_max = 10
+        #self.t_max = 10
         self.tau = 0.01
         self.test_interval = 1000
         self.num_test_episodes = 10
