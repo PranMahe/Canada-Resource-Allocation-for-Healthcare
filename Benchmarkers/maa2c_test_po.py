@@ -1,12 +1,14 @@
 import torch as th
 import numpy as np
 import torch.nn.functional as F
+from Helpers.A2C.maa2c_helper import Helper
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 
 class MAA2CtesterPS:
     @staticmethod
-    def test_MAA2C_ParameterSharing(env, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim, action_dim):
+    def test_MAA2C_ParameterSharing(env, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim, action_dim, action_mapping):
+        
         test_rewards = np.zeros(num_test_episodes)
         with th.no_grad():
             for i in range(num_test_episodes):
@@ -21,7 +23,8 @@ class MAA2CtesterPS:
 
                     # Collect actions for each agent
                     for a in range(num_agents):
-                        observation = env.get_observation(a, t)
+                        raw_observation = env.get_observation(a)
+                        observation = Helper.process_observation(raw_observation, env.num_patients_per_hospital, env.num_specialists_per_hospital)
                         observation = th.tensor(observation, dtype=th.float32).to(device)
                         agent_id = th.nn.functional.one_hot(th.tensor(a), num_classes=num_agents).float().unsqueeze(0).to(device)
                         prev_action_a = prev_actions[a]
@@ -37,7 +40,8 @@ class MAA2CtesterPS:
                         prev_actions[a] = F.one_hot(th.tensor(action_idx), num_classes=action_dim).float().unsqueeze(0).to(device)
 
                     # Execute actions in the environment
-                    global_reward, individual_rewards, _ = env.step(actions)
+                    mapped_actions = [action_mapping[a_idx] for a_idx in actions]
+                    global_reward, individual_rewards, _ = env.step(mapped_actions)
                     total_rewards += global_reward
                 
                 test_rewards[i] += total_rewards

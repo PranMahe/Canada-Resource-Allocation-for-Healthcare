@@ -8,19 +8,23 @@ import matplotlib.pyplot as plt
 from Networks.Actors.maa2c_actor_gru import A2CActorShared
 from Networks.Critics.maa2c_critic_gru import A2CCentralizedCritic
 
-from Helpers.A2C.maa2c_helper import BatchTraining
+from Helpers.A2C.maa2c_helper import Helper, BatchTraining
 from Benchmarkers.maa2c_test_po import MAA2CtesterPS
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
 class MAA2CtrainerPS:
     @staticmethod
-    def train_MAA2C_ParameterSharing(trial_run, env, env_name, state_dim, observation_dim, action_dim, num_agents, gamma, actor_hidden_dim, critic_hidden_dim,
-                                    value_dim, alpha, beta, reward_standardization, num_batch_episodes, t_max, tau,
+    def train_MAA2C_ParameterSharing(trial_run, env, state_dim, observation_dim, action_dim, num_patients, num_specialists,
+                                    num_agents, gamma, actor_hidden_dim, critic_hidden_dim,
+                                    value_dim, alpha, beta, num_batch_episodes, t_max, tau,
                                     test_interval, num_training_episodes, num_test_episodes): 
         
         csv_file = open(f'MAA2C_trial_{trial_run}_HCRA.csv', 'a', newline='')
         csv_writer = csv.writer(csv_file)
+
+        action_mapping = Helper.create_action_mapping(num_patients, num_specialists)
+        action_dim = len(action_mapping)
 
         actor_shared = A2CActorShared(observation_dim, action_dim, actor_hidden_dim, num_agents).to(device)
         critic = A2CCentralizedCritic(state_dim, observation_dim, action_dim, critic_hidden_dim, value_dim, num_agents).to(device)
@@ -37,6 +41,7 @@ class MAA2CtrainerPS:
             batch_rtrns = [[] for _ in range(num_batch_episodes)]
             for e in range(num_batch_episodes):
                 
+                env.reset()
                 total_rewards = 0
                 done = False
                 buffer = {'global_states':[],'observations': [], 'joint_actions': [], 'global_rewards': [], 'global_next_states':[], 'next_observations': []}
@@ -49,10 +54,12 @@ class MAA2CtrainerPS:
                     observations = []
 
                     # Collect actions for each agent
-                    global_state = env.get_global_state(t)
+                    global_state_raw = env.get_global_state(a)
+                    global_state = Helper.process_global_state(global_state_raw, env.num_patients, env.num_specialists, env.num_specialties)
                     global_state = th.tensor(global_state, dtype=th.float32).squeeze().to(device)
                     for a in range(num_agents):
-                        observation = env.get_observation(a, t)
+                        raw_observation = env.get_observation(a)
+                        observation = Helper.process_observation(raw_observation, env.num_patients_per_hospital, env.num_specialists_per_hospital)
                         observation = th.tensor(observation, dtype=th.float32).to(device)
                         observations.append(observation.squeeze())
                         agent_id = th.nn.functional.one_hot(th.tensor(a), num_classes=num_agents).float().unsqueeze(0).to(device)
@@ -68,7 +75,8 @@ class MAA2CtrainerPS:
                         actions.append(action_idx)
                     # Execute actions in the environment
                     joint_action = actions
-                    global_reward, individual_rewards, done = env.step(actions)
+                    mapped_actions = [action_mapping[a_idx] for a_idx in actions]
+                    global_reward, individual_rewards, done = env.step(mapped_actions)
                     
                     global_next_state = env.get_global_state(t)
                     global_next_state = th.tensor(global_next_state, dtype=th.float32).squeeze().to(device)
@@ -108,7 +116,7 @@ class MAA2CtrainerPS:
 
                 if (episode) % test_interval == 0:
                     actor_shared.eval()
-                    test_reward = MAA2CtesterPS.test_MAA2C_ParameterSharing(env, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim, action_dim)
+                    test_reward = MAA2CtesterPS.test_MAA2C_ParameterSharing(env, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim, action_dim, action_mapping)
                     test_rewards.append(test_reward)
                     csv_writer.writerow([test_reward])
                     csv_file.flush()
