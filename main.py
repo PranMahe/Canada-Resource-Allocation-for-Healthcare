@@ -33,8 +33,7 @@ def main():
     if args.env == 'HCRA': # Partial Observable
         env_params = HCRAparams()
         env = HCRA(env_params.num_agents, env_params.num_patients, env_params.num_specialists, env_params.num_specialties,
-                   env_params.num_hospitals, env_params.num_patients_per_hospital, env_params.num_specialists_per_hospital,
-                   env_params.max_wait_time, env_params.episode_length)
+                   env_params.num_hospitals, env_params.max_wait_time, env_params.episode_length)
 
         # Create the runner
         # More runners can be added here

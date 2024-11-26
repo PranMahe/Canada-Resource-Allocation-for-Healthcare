@@ -31,8 +31,8 @@ class MAA2CrunnerPO:
             'num_test_episodes': params.num_test_episodes,
             'batch_size': params.batch_size,
             'action_mapping': self.env.action_mapping,
-            'max_patients_per_hospital': self.env.num_patients_per_hospital,
-            'max_specialists_per_hospital': self.env.num_specialists_per_hospital,
+            'max_patients_per_hospital': self.env.max_patients_per_hospital,
+            'max_specialists_per_hospital': self.env.max_specialists_per_hospital,
             'num_specialties': self.env.num_specialties
         }
 

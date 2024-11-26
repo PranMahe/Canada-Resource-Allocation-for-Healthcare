@@ -214,6 +214,7 @@ class MAA2CtrainerPO:
 
                 # Calculate Advantage
                 advantages = (batch_rtrns - V_values).detach()
+                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
                 # Actor Loss
                 actor_loss = -(log_probs * advantages).mean() - tau * entropies.mean()

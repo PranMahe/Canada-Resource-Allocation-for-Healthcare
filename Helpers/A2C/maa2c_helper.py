@@ -2,8 +2,6 @@ import torch as th
 import numpy as np
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-
-
 class BatchTraining:
     def __init__ (self):
         pass

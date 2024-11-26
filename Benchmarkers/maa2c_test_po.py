@@ -18,8 +18,6 @@ class MAA2CtesterPS:
             num_specialists=env_params.num_specialists,
             num_specialties=env_params.num_specialties,
             num_hospitals=env_params.num_hospitals,
-            num_patients_per_hospital=env_params.num_patients_per_hospital,
-            num_specialists_per_hospital=env_params.num_specialists_per_hospital,
             max_wait_time=env_params.max_wait_time,
             episode_length=env_params.episode_length,
             seed=seed
