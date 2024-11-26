@@ -13,7 +13,7 @@ from Benchmarkers.ippo_test_po import IPPOtester
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-class IPPO_Trainer:
+class IPPO_TrainerPO:
     def __init__(self):
         self.rtrn_running_mean = 0
         self.rtrn_running_var = 1

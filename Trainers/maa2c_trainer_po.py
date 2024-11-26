@@ -8,23 +8,22 @@ import matplotlib.pyplot as plt
 from Networks.Actors.maa2c_actor_gru import A2CActorShared
 from Networks.Critics.maa2c_critic_gru import A2CCentralizedCritic
 
-from Helpers.A2C.maa2c_helper import Helper, BatchTraining
+from Helpers.A2C.maa2c_helper import BatchTraining
 from Benchmarkers.maa2c_test_po import MAA2CtesterPS
+
+from Envs.Environment import HCRA
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-class MAA2CtrainerPS:
+class MAA2CtrainerPO:
     @staticmethod
-    def train_MAA2C_ParameterSharing(trial_run, env, state_dim, observation_dim, action_dim, num_patients, num_specialists,
-                                    num_agents, gamma, actor_hidden_dim, critic_hidden_dim,
-                                    value_dim, alpha, beta, num_batch_episodes, t_max, tau,
-                                    test_interval, num_training_episodes, num_test_episodes): 
+    def train_MAA2C_ParameterSharing(trial_run, env, env_params, state_dim, observation_dim, action_dim, num_patients, num_specialists,
+                                 num_agents, gamma, actor_hidden_dim, critic_hidden_dim, value_dim, alpha, beta,
+                                 batch_size, t_max, tau, test_interval, num_training_iterations, num_test_episodes,
+                                 action_mapping, max_patients_per_hospital, max_specialists_per_hospital, num_specialties): 
         
         csv_file = open(f'MAA2C_trial_{trial_run}_HCRA.csv', 'a', newline='')
         csv_writer = csv.writer(csv_file)
-
-        action_mapping = Helper.create_action_mapping(num_patients, num_specialists)
-        action_dim = len(action_mapping)
 
         actor_shared = A2CActorShared(observation_dim, action_dim, actor_hidden_dim, num_agents).to(device)
         critic = A2CCentralizedCritic(state_dim, observation_dim, action_dim, critic_hidden_dim, value_dim, num_agents).to(device)
@@ -36,10 +35,10 @@ class MAA2CtrainerPS:
         test_rewards = []
 
         episode = 0
-        for te in range(num_training_episodes):
-            batch_buffer = [{'global_states': [], 'observations': [], 'joint_actions': []} for _ in range (num_batch_episodes)]
-            batch_rtrns = [[] for _ in range(num_batch_episodes)]
-            for e in range(num_batch_episodes):
+        for te in range(num_training_iterations):
+            batch_buffer = [{'global_states': [], 'observations': [], 'joint_actions': []} for _ in range (batch_size)]
+            batch_rtrns = [[] for _ in range(batch_size)]
+            for e in range(batch_size):
                 
                 env.reset()
                 total_rewards = 0
@@ -54,13 +53,13 @@ class MAA2CtrainerPS:
                     observations = []
 
                     # Collect actions for each agent
-                    global_state_raw = env.get_global_state(a)
-                    global_state = Helper.process_global_state(global_state_raw, env.num_patients, env.num_specialists, env.num_specialties)
+                    global_state_raw = env.get_global_state()
+                    global_state = HCRA.process_global_state(global_state_raw, num_patients, num_specialists, num_specialties)
                     global_state = th.tensor(global_state, dtype=th.float32).squeeze().to(device)
                     for a in range(num_agents):
                         raw_observation = env.get_observation(a)
-                        observation = Helper.process_observation(raw_observation, env.num_patients_per_hospital, env.num_specialists_per_hospital)
-                        observation = th.tensor(observation, dtype=th.float32).to(device)
+                        observation = HCRA.process_observation(raw_observation, max_patients_per_hospital, max_specialists_per_hospital, num_specialties)
+                        observation = th.tensor(observation, dtype=th.float32).unsqueeze(0).to(device)
                         observations.append(observation.squeeze())
                         agent_id = th.nn.functional.one_hot(th.tensor(a), num_classes=num_agents).float().unsqueeze(0).to(device)
                         prev_action_a = prev_actions[a]
@@ -78,11 +77,13 @@ class MAA2CtrainerPS:
                     mapped_actions = [action_mapping[a_idx] for a_idx in actions]
                     global_reward, individual_rewards, done = env.step(mapped_actions)
                     
-                    global_next_state = env.get_global_state(t)
+                    raw_global_next_state = env.get_global_state()
+                    global_next_state = HCRA.process_global_state(raw_global_next_state, num_patients, num_specialists, num_specialties)
                     global_next_state = th.tensor(global_next_state, dtype=th.float32).squeeze().to(device)
                     next_observations = []
                     for a in range(num_agents):
-                        next_observation = env.get_state4(a, t + 1)
+                        raw_next_observation = env.get_observation(a)
+                        next_observation = HCRA.process_observation(raw_next_observation, max_patients_per_hospital, max_specialists_per_hospital, num_specialties)
                         next_observation = th.tensor(next_observation, dtype=th.float32).squeeze().to(device)
                         next_observations.append(next_observation)
 
@@ -102,7 +103,19 @@ class MAA2CtrainerPS:
                 if done:
                     R = 0
                 else:
-                    R = critic(buffer['observation'][-1]).item() # INCORRECT IMPLEMENTATION
+                    last_global_state = buffer['global_next_states'][-1]
+                    last_observations = buffer['next_observations'][-1]
+                    # Prepare input for critic
+                    agent_indices = th.arange(num_agents).to(device)
+                    agent_id = F.one_hot(agent_indices, num_classes=num_agents).float()  # [num_agents, num_agents]
+                    prev_joint_actions = buffer['joint_actions'][-1]
+                    prev_joint_actions = th.tensor(prev_joint_actions, dtype=th.long).to(device)
+                    prev_joint_actions_one_hot = F.one_hot(prev_joint_actions, num_classes=action_dim)
+                    prev_joint_actions_concat = prev_joint_actions_one_hot.reshape(1, action_dim * num_agents)
+                    x = th.cat([last_global_state.unsqueeze(0).repeat(num_agents, 1), th.stack(last_observations), agent_id, prev_joint_actions_concat.repeat(num_agents, 1)], dim=-1)
+                    V, _ = critic(x, None)
+                    R = V.mean().item()
+
                 for global_reward in reversed(buffer['global_rewards']):
                     R = global_reward + gamma * R
                     rtrns.insert(0, R)
@@ -116,7 +129,9 @@ class MAA2CtrainerPS:
 
                 if (episode) % test_interval == 0:
                     actor_shared.eval()
-                    test_reward = MAA2CtesterPS.test_MAA2C_ParameterSharing(env, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim, action_dim, action_mapping)
+                    test_reward = MAA2CtesterPS.test_MAA2C_ParameterSharing(env_params, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim,
+                                                                            action_dim, action_mapping, max_patients_per_hospital, max_specialists_per_hospital,
+                                                                            num_specialties, seed=69)
                     test_rewards.append(test_reward)
                     csv_writer.writerow([test_reward])
                     csv_file.flush()

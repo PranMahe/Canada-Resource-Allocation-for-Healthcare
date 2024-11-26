@@ -2,9 +2,8 @@ from Configuration.ia2c_params import IA2Cparameters
 from Trainers.ia2c_trainer_po import IA2CtrainerPO
 
 class IA2CrunnerPO:
-    def __init__(self, env, env_name):
+    def __init__(self, env):
         self.env = env
-        self.env_name = env_name
         
     def run_experiment(self):
         params = IA2Cparameters()
@@ -15,7 +14,7 @@ class IA2CrunnerPO:
             'state_dim': self.env.stateDim,
             'observation_dim': self.env.local_stateDim,
             'action_dim': self.env.actionDim,
-            'num_agents': self.num_agents,
+            'num_agents': self.env.num_agents,
             'gamma': params.gamma,
             'actor_hidden_dim': params.actor_hidden_dim,
             'critic_hidden_dim': params.critic_hidden_dim,
@@ -23,7 +22,7 @@ class IA2CrunnerPO:
             'alpha': params.alpha,
             'beta': params.beta,
             'reward_standardization': params.reward_standardization,
-            't_max': self.env.t_max,
+            't_max': self.env.episode_length,
             'tau': params.tau,
             'test_interval': params.test_interval,
             'num_training_iteration': params.num_training_iteration,

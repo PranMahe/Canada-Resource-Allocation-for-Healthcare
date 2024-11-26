@@ -1,8 +1,7 @@
 import argparse
 
 # Import envs and runners here
-# from envs.matrixgame import create_climbing_game, create_penalty_game, create_tnt_game
-# from envs.matrixgame import *
+from Configuration.env_params import HCRAparams
 from Envs.Environment import *
 from Runners.ia2c_runner_po import IA2CrunnerPO
 from Runners.maa2c_runner_po import MAA2CrunnerPO
@@ -30,22 +29,23 @@ def main():
     # Create the environment
     # You can set environment hyperparameters here
     # More environements can be added here
-    env = Environ()
         
     if args.env == 'HCRA': # Partial Observable
-        env = env.create_hcra()
-        env_name = "HCRA"
+        env_params = HCRAparams()
+        env = HCRA(env_params.num_agents, env_params.num_patients, env_params.num_specialists, env_params.num_specialties,
+                   env_params.num_hospitals, env_params.num_patients_per_hospital, env_params.num_specialists_per_hospital,
+                   env_params.max_wait_time, env_params.episode_length)
 
         # Create the runner
         # More runners can be added here
         if args.algo == 'ia2c':
-            runner = IA2CrunnerPO(env, env_name)
+            runner = IA2CrunnerPO(env, env_params)
         elif args.algo == 'maa2c':
-            runner = MAA2CrunnerPO(env, env_name)
+            runner = MAA2CrunnerPO(env, env_params)
         elif args.algo == 'ippo':
-            runner = IPPOrunnerPO(env, env_name)
+            runner = IPPOrunnerPO(env, env_params)
         elif args.algo == 'mappo':
-            runner = MAPPOrunnerPO(env, env_name)
+            runner = MAPPOrunnerPO(env, env_params)
         else:
             raise ValueError("Algorithm name incorrect or not found")
     else:

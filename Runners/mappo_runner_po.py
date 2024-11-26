@@ -2,9 +2,8 @@ from Configuration.mappo_params import MAPPOparameters
 from Trainers import mappo_trainer_po
 
 class MAPPOrunnerPO:
-    def __init__(self, env, num_agents):
+    def __init__(self, env):
         self.env = env
-        self.num_agents = num_agents
 
     def run_experiment(self):
         params = MAPPOparameters()
@@ -24,11 +23,11 @@ class MAPPOrunnerPO:
             'eps_clip': params.eps_clip,
             'num_mini_batches': params.num_mini_batches,
             'epochs': params.epochs,
-            't_max': self.env.t_max,
+            't_max': self.env.episode_length,
             'test_interval': params.test_interval,
             'num_training_iteration': params.num_training_iteration,
             'num_test_episodes': params.num_test_episodes,
-            'num_agents': self.num_agents,
+            'num_agents': self.env.num_agents,
             'batch_size': params.batch_size,
         }
          

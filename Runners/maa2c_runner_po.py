@@ -2,32 +2,38 @@ from Configuration.maa2c_params import MAA2Cparameters
 from Trainers.maa2c_trainer_po import MAA2CtrainerPO
 
 class MAA2CrunnerPO:
-    def __init__(self, env, num_agents):
+    def __init__(self, env, env_params):
         self.env = env
-        self.num_agents = num_agents
+        self.env_params = env_params
         
     def run_experiment(self):
         params = MAA2Cparameters()
 
         train_params = {
-            'state_dim': self.env.stateDim,
-            'observation_dim': self.local_stateDim,
-            'action_dim': self.env.actionDim,
+            'env': self.env,
+            'env_params': self.env_params,
+            'state_dim': self.env.state_dim,
+            'observation_dim': self.env.observation_dim,
+            'action_dim': self.env.action_dim,
             'num_patients': self.env.num_patients,
             'num_specialists': self.env.num_specialists,
-            'num_agents': self.num_agents,
+            'num_agents': self.env.num_agents,
             'gamma': params.gamma,
             'actor_hidden_dim': params.actor_hidden_dim,
             'critic_hidden_dim': params.critic_hidden_dim,
             'value_dim': params.value_dim,
             'alpha': params.alpha,
             'beta': params.beta,
-            't_max': self.env.t_max,
+            't_max': self.env.episode_length,
             'tau': params.tau,
             'test_interval':params.test_interval,
-            'num_training_iteration': params.num_training_iteration,
+            'num_training_iterations': params.num_training_iterations,
             'num_test_episodes': params.num_test_episodes,
-            'batch_size': params.num_batch_episodes,
+            'batch_size': params.batch_size,
+            'action_mapping': self.env.action_mapping,
+            'max_patients_per_hospital': self.env.num_patients_per_hospital,
+            'max_specialists_per_hospital': self.env.num_specialists_per_hospital,
+            'num_specialties': self.env.num_specialties
         }
 
         for trial in range(params.num_trials):
