@@ -22,7 +22,7 @@ NOTE:
     For specific algorithm configurations, you must look in the config file
     to set algorithm hyperparameters as well as algorithm variation parameters.
 
-    When Plotting, there must be CSV files to get plot, only run the plotting
+    When Plotting, there must be CSV files to get plots, only run the plotting
     script when done running required experiments
 '''
 
