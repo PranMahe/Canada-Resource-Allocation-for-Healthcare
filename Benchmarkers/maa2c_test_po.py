@@ -20,6 +20,7 @@ class MAA2CtesterPS:
             num_hospitals=env_params.num_hospitals,
             max_wait_time=env_params.max_wait_time,
             episode_length=env_params.episode_length,
+            hospital_capacities=env_params.hospital_capacities,
             seed=seed
         )
 

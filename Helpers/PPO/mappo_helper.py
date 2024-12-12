@@ -128,8 +128,8 @@ class BatchProcessing:
             episode_states = []
             for state_per_timestep in episode_buffer['global_states']:
                 # states_per_timestep: list of [state_dim]
-                states_per_timestep_tensor = th.stack(state_per_timestep) # Shape: num_agents, state_dim]
-                episode_states.append(states_per_timestep_tensor)
+                #states_per_timestep_tensor = th.stack(state_per_timestep) # Shape: num_agents, state_dim]
+                episode_states.append(state_per_timestep)
             episode_states_tensor = th.stack(episode_states) # Shape [timesteps, num_agents, state_dim]
             batch_global_states.append(episode_states_tensor)
 

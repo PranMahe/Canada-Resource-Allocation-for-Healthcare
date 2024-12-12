@@ -1,5 +1,6 @@
 import numpy as np
 import torch as th
+import random
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import csv
@@ -10,6 +11,8 @@ from Networks.Critics.mappo_critic_gru import Critic
 
 from Helpers.PPO.mappo_helper import Helper, BatchProcessing
 from Benchmarkers.mappo_test_po import MAPPOtester
+
+from Envs.Environment import HCRA
 
 device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -22,16 +25,22 @@ class MAPPO_Trainer:
         self.adv_running_var = 1
         self.adv_count = 1e-4
 
-    def train_MAPPO(self, trial_run, env, env_name, state_dim, observation_dim, action_dim, gamma, actor_hidden_dim, critic_hidden_dim,
+    def train_MAPPO(self, trial_run, env, env_params, state_dim, observation_dim, action_dim, 
+                    num_patients, num_specialists, gamma, actor_hidden_dim, critic_hidden_dim,
                     value_dim, alpha, beta, lam, entropy_coef, eps_clip, num_mini_batches, epochs, t_max,
-                    test_interval, training_iteration, num_test_episodes, num_agents, batch_size
+                    test_interval, num_training_iteration, num_test_episodes, num_agents, batch_size,
+                    action_mapping, max_patients_per_hospital, max_specialists_per_hospital, num_specialties
                     ):
         
+        seeds = random.sample(range(1, 12), 10) # Generating 10 unique seeds
+        # seeds = [4]
+        num_seeds = len(seeds)
+
         csv_file = open(f'MAPPO_trial_{trial_run}_HCRA.csv', 'a', newline='')
         csv_writer = csv.writer(csv_file)
         
         actor_shared = Actor(observation_dim, action_dim, actor_hidden_dim, num_agents).to(device)
-        centralized_critic = Critic(state_dim, action_dim, critic_hidden_dim, value_dim, num_agents).to(device)
+        centralized_critic = Critic(state_dim, observation_dim, action_dim, critic_hidden_dim, value_dim, num_agents).to(device)
 
         actor_optimizer = th.optim.Adam(actor_shared.parameters(), lr=alpha)
         critic_optimizer = th.optim.Adam(centralized_critic.parameters(), lr=beta)
@@ -41,7 +50,7 @@ class MAPPO_Trainer:
 
         episode = 0
 
-        for it in range(training_iteration):
+        for it in range(num_training_iteration):
             batch_buffer = [{'global_states': [],
                              'observations': [],
                              'joint_actions': [],
@@ -53,6 +62,8 @@ class MAPPO_Trainer:
             batch_advantages = [[] for _ in range(batch_size)]
 
             for e in range(batch_size):
+                selected_seed = seeds[episode % num_seeds]
+                env.reset(seed = selected_seed)
                 buffer = {'global_states':[],
                           'observations': [],
                           'joint_actions': [],
@@ -76,20 +87,23 @@ class MAPPO_Trainer:
                     actions = []
                     old_log_probs = []
                     observations = []
-                    fp_states = []
+                    #fp_states = []
                     curr_prev_actions = []
 
                     # Collect actions for each agent
-                    global_state = env.get_global_state(t)
+                    global_state_raw = env.get_global_state()
+                    global_state = HCRA.process_global_state(global_state_raw, num_patients, num_specialists, num_specialties)
                     global_state = th.tensor(global_state, dtype=th.float32).squeeze().to(device)
                     for a in range(num_agents):
                         with th.no_grad():
-                            observation = env.get_observation(a, t)
-                            observation = th.tensor(observation, dtype=th.float32).to(device)
+                            raw_observation = env.get_observation(a)
+                            observation = HCRA.process_observation(raw_observation, max_patients_per_hospital, max_specialists_per_hospital, num_specialties)
+                            observation = th.tensor(observation, dtype=th.float32).unsqueeze(0).to(device)
                             observations.append(observation.squeeze())
                             agent_id = th.nn.functional.one_hot(th.tensor(a), num_classes=num_agents).float().unsqueeze(0).to(device)
-                            fp_state = Helper.create_fp_state(global_state, observation, a, agent_id)
-                            fp_states.append(fp_state)
+                            # Feature Pruning - Not Necessary
+                            #fp_state = Helper.create_fp_state(global_state, observation, a, agent_id)
+                            #fp_states.append(fp_state)
 
                             prev_action_a = prev_actions[a]
                             x = th.cat([observation, agent_id, prev_action_a], dim=-1).unsqueeze(0)
@@ -112,25 +126,30 @@ class MAPPO_Trainer:
                     values = []
                     for a in range(num_agents):
                         with th.no_grad():
-                            state_input = fp_states[a].unsqueeze(0)
+                            #state_input = fp_states[a].unsqueeze(0)
                             prev_action_c = prev_joint_action
-                            x = th.cat([state_input, prev_action_c], dim=-1).unsqueeze(0)
+                            #x = th.cat([state_input, prev_action_c], dim=-1).unsqueeze(0)
+                            agent_id = th.nn.functional.one_hot(th.tensor(a), num_classes=num_agents).float().unsqueeze(0).to(device)
+                            x = th.cat([global_state.unsqueeze(0), observations[a].unsqueeze(0), prev_action_c, agent_id], dim=-1).unsqueeze(0)
                             value, hidden_state_c = centralized_critic(x, hidden_states_critic[a])
                             hidden_states_critic[a] = hidden_state_c
                             values.append(value.squeeze())
 
-                    global_reward, individual_rewards, done = env.reward_step(actions)
+                    mapped_actions = [action_mapping[a_idx] for a_idx in actions]
+                    global_reward, individual_rewards, done = env.step(mapped_actions)
                     individual_rewards = [th.tensor(r, dtype=th.float32).to(device) for r in individual_rewards]
                     
-                    global_next_state = env.get_state([0, 0], 0, t + 1)
+                    raw_global_next_state = env.get_global_state()
+                    global_next_state = HCRA.process_global_state(raw_global_next_state, num_patients, num_specialists, num_specialties)
                     global_next_state = th.tensor(global_next_state, dtype=th.float32).squeeze().to(device)
                     next_observations = []
                     for a in range(num_agents):
-                        next_observation = env.get_state4([a, 0], 0, t + 1)
+                        raw_next_observation = env.get_observation(a)
+                        next_observation = HCRA.process_observation(raw_next_observation, max_patients_per_hospital, max_specialists_per_hospital, num_specialties)
                         next_observation = th.tensor(next_observation, dtype=th.float32).squeeze().to(device)
                         next_observations.append(next_observation)                                
 
-                    buffer['global_states'].append(fp_states)
+                    buffer['global_states'].append(global_state)
                     buffer['observations'].append(observations)
                     buffer['joint_actions'].append(joint_action)
                     buffer['individual_rewards'].append(individual_rewards)
@@ -166,7 +185,9 @@ class MAPPO_Trainer:
 
                 if (episode) % test_interval == 0:
                     actor_shared.eval()
-                    test_reward = MAPPOtester.test_MAPPO(env, actor_shared, num_test_episodes, num_agents, t_max, actor_hidden_dim, action_dim)
+                    test_reward = MAPPOtester.test_MAPPO(env_params, actor_shared, num_test_episodes, num_agents, t_max, actor_hidden_dim, 
+                                                         action_dim, action_mapping, max_patients_per_hospital, max_specialists_per_hospital,
+                                                         num_specialties, seed=4)
                     test_rewards.append(test_reward)
                     csv_writer.writerow([test_reward])
                     csv_file.flush()
@@ -234,7 +255,9 @@ class MAPPO_Trainer:
                     critic_optimizer.zero_grad()
                     total_critic_loss = 0
                     for a in range(num_agents):
-                        x = th.cat([global_states_mb[:, :, a, :], prev_joint_actions_mb_concat], dim=-1)
+                        agent_indices = th.full((mb_size, timesteps), a, dtype=th.long).to(device) 
+                        agent_id = F.one_hot(agent_indices, num_classes=num_agents).float() # [batch_size, timesteps, num_agents]
+                        x = th.cat([global_states_mb, observations_mb[:, :, a, : ], agent_id, prev_joint_actions_mb_concat], dim=-1)
                         values, _ = centralized_critic(x, hidden_state_critic[a])
                         values = values.squeeze(-1)
                         critic_loss = Helper.critic_loss_fn(values, values_mb[:, :, a], returns_mb[:, :, a], eps_clip)

@@ -1,5 +1,6 @@
 import numpy as np
 import torch as th
+import random
 import torch.nn.functional as F
 from torch.distributions import Categorical
 import csv
@@ -22,6 +23,10 @@ class MAA2CtrainerPO:
                                  batch_size, t_max, tau, test_interval, num_training_iterations, num_test_episodes,
                                  action_mapping, max_patients_per_hospital, max_specialists_per_hospital, num_specialties): 
         
+        seeds = random.sample(range(1, 12), 10) # Generating 10 unique seeds
+        # seeds = [4]
+        num_seeds = len(seeds)
+
         csv_file = open(f'MAA2C_trial_{trial_run}_HCRA.csv', 'a', newline='')
         csv_writer = csv.writer(csv_file)
 
@@ -39,11 +44,11 @@ class MAA2CtrainerPO:
             batch_buffer = [{'global_states': [], 'observations': [], 'joint_actions': []} for _ in range (batch_size)]
             batch_rtrns = [[] for _ in range(batch_size)]
             for e in range(batch_size):
-                
-                env.reset()
+                selected_seed = seeds[episode % num_seeds]
+                env.reset(seed = selected_seed)
                 total_rewards = 0
                 done = False
-                buffer = {'global_states':[],'observations': [], 'joint_actions': [], 'global_rewards': [], 'global_next_states':[], 'next_observations': []}
+                buffer = {'global_states':[],'observations': [], 'joint_actions': [], 'individual_rewards': [], 'global_next_states':[], 'next_observations': []}
                 hidden_state = [th.zeros(1, 1, actor_hidden_dim).to(device) for _ in range(num_agents)]
                 prev_actions = [th.zeros(1, action_dim).to(device) for _ in range(num_agents)]
 
@@ -76,7 +81,7 @@ class MAA2CtrainerPO:
                     joint_action = actions
                     mapped_actions = [action_mapping[a_idx] for a_idx in actions]
                     global_reward, individual_rewards, done = env.step(mapped_actions)
-                    
+
                     raw_global_next_state = env.get_global_state()
                     global_next_state = HCRA.process_global_state(raw_global_next_state, num_patients, num_specialists, num_specialties)
                     global_next_state = th.tensor(global_next_state, dtype=th.float32).squeeze().to(device)
@@ -90,7 +95,7 @@ class MAA2CtrainerPO:
                     buffer['global_states'].append(global_state)
                     buffer['observations'].append(observations)
                     buffer['joint_actions'].append(joint_action)
-                    buffer['global_rewards'].append(global_reward)
+                    buffer['individual_rewards'].append(individual_rewards)
                     buffer['global_next_states'].append(global_next_state)
                     buffer['next_observations'].append(next_observations)
 
@@ -99,39 +104,41 @@ class MAA2CtrainerPO:
                 episode_rewards.append(np.mean(total_rewards))
                 episode += 1
 
-                rtrns = []
-                if done:
-                    R = 0
-                else:
-                    last_global_state = buffer['global_next_states'][-1]
-                    last_observations = buffer['next_observations'][-1]
-                    # Prepare input for critic
-                    agent_indices = th.arange(num_agents).to(device)
-                    agent_id = F.one_hot(agent_indices, num_classes=num_agents).float()  # [num_agents, num_agents]
-                    prev_joint_actions = buffer['joint_actions'][-1]
-                    prev_joint_actions = th.tensor(prev_joint_actions, dtype=th.long).to(device)
-                    prev_joint_actions_one_hot = F.one_hot(prev_joint_actions, num_classes=action_dim)
-                    prev_joint_actions_concat = prev_joint_actions_one_hot.reshape(1, action_dim * num_agents)
-                    x = th.cat([last_global_state.unsqueeze(0).repeat(num_agents, 1), th.stack(last_observations), agent_id, prev_joint_actions_concat.repeat(num_agents, 1)], dim=-1)
-                    V, _ = critic(x, None)
-                    R = V.mean().item()
-
-                for global_reward in reversed(buffer['global_rewards']):
-                    R = global_reward + gamma * R
-                    rtrns.insert(0, R)
-                rtrns = th.tensor(np.array(rtrns), dtype=th.float32).to(device)
-                #rtrns_per_agent = np.repeat(np.array(rtrns), num_agents, axis=1)  # Shape [batch_size, num_agents, 1]
-                
+                rtrns = [0.0 for _ in range(num_agents)]
+                # Compute discounted returns per agent
+                returns = []
+                for a in range(num_agents):
+                    R = 0 if done else rtrns[a]
+                    agent_rtrns = []
+                    for reward in reversed(buffer['individual_rewards']):
+                        R = reward[a] + gamma * R
+                        agent_rtrns.insert(0, R)
+                        
+                    returns.append(agent_rtrns)
+                returns = th.tensor(returns, dtype=th.float32).to(device)
+                #returns = returns.transpose(0, 1)
+                normalized_rtrns = []
+                for a in range(num_agents):
+                    returns_a = np.array(returns[a], dtype=np.float32)
+                    returns_mean = returns_a.mean()
+                    returns_std = returns_a.std() + 1e-8
+                    normalized = (returns_a - returns_mean) / returns_std
+                    normalized_rtrns.append(normalized)
+                # Stack normalized returns per agent
+                # Shape: [timesteps, num_agents]
+                normalized_rtrns = np.stack(normalized_rtrns, axis=1)
+                # Convert to tensor
+                normalized_rtrns = th.tensor(normalized_rtrns, dtype=th.float32).to(device)
                 batch_buffer[e]['global_states'].extend(buffer['global_states'])
                 batch_buffer[e]['observations'].extend(buffer['observations'])
                 batch_buffer[e]['joint_actions'].extend(buffer['joint_actions'])
-                batch_rtrns[e].extend(rtrns)
+                batch_rtrns[e].extend(normalized_rtrns)
 
                 if (episode) % test_interval == 0:
                     actor_shared.eval()
                     test_reward = MAA2CtesterPS.test_MAA2C_ParameterSharing(env_params, actor_shared, num_test_episodes, t_max, num_agents, actor_hidden_dim,
                                                                             action_dim, action_mapping, max_patients_per_hospital, max_specialists_per_hospital,
-                                                                            num_specialties, seed=69)
+                                                                            num_specialties, seed=4)
                     test_rewards.append(test_reward)
                     csv_writer.writerow([test_reward])
                     csv_file.flush()
@@ -179,8 +186,7 @@ class MAA2CtrainerPO:
                 x = th.cat([batch_global_states, batch_observations[:, :, a, :], agent_id, batch_prev_joint_actions_concat], dim=-1)
                 V, _ = critic(x, hidden_state_critic)
                 V = V.squeeze(-1)
-                
-                critic_loss = (batch_rtrns - V).pow(2).mean()
+                critic_loss = (batch_rtrns[:, :, a] - V).pow(2).mean()
                 total_critic_loss += critic_loss
             
             total_critic_loss /= num_agents
@@ -213,7 +219,7 @@ class MAA2CtrainerPO:
                 V_values = V_values.squeeze(-1)
 
                 # Calculate Advantage
-                advantages = (batch_rtrns - V_values).detach()
+                advantages = (batch_rtrns[:, :, a] - V_values).detach()
                 advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
                 # Actor Loss

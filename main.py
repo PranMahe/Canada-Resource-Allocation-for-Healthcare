@@ -3,9 +3,7 @@ import argparse
 # Import envs and runners here
 from Configuration.env_params import HCRAparams
 from Envs.Environment import *
-from Runners.ia2c_runner_po import IA2CrunnerPO
 from Runners.maa2c_runner_po import MAA2CrunnerPO
-from Runners.ippo_runner_po import IPPOrunnerPO
 from Runners.mappo_runner_po import MAPPOrunnerPO
 
 '''
@@ -23,7 +21,7 @@ NOTE:
 def main():
     parser = argparse.ArgumentParser(description="Run different variations of algorithms and environments.")
     parser.add_argument('--env', type=str, required=True, help='The environment to run. Choose from "HCRA".')
-    parser.add_argument('--algo', type=str, required=True, help='The algorithm to use. Choose from "maa2c", "ia2c", "mappo", or "ippo".')
+    parser.add_argument('--algo', type=str, required=True, help='The algorithm to use. Choose from "maa2c", OR "mappo".')
     args = parser.parse_args()
 
     # Create the environment
@@ -33,16 +31,12 @@ def main():
     if args.env == 'HCRA': # Partial Observable
         env_params = HCRAparams()
         env = HCRA(env_params.num_agents, env_params.num_patients, env_params.num_specialists, env_params.num_specialties,
-                   env_params.num_hospitals, env_params.max_wait_time, env_params.episode_length)
+                   env_params.num_hospitals, env_params.max_wait_time, env_params.episode_length, env_params.hospital_capacities)
 
         # Create the runner
         # More runners can be added here
-        if args.algo == 'ia2c':
-            runner = IA2CrunnerPO(env, env_params)
-        elif args.algo == 'maa2c':
+        if args.algo == 'maa2c':
             runner = MAA2CrunnerPO(env, env_params)
-        elif args.algo == 'ippo':
-            runner = IPPOrunnerPO(env, env_params)
         elif args.algo == 'mappo':
             runner = MAPPOrunnerPO(env, env_params)
         else:

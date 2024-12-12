@@ -4,7 +4,7 @@ import random
 
 class HCRA:
     def __init__(self, num_agents, num_patients, num_specialists, num_specialties, num_hospitals,
-                 max_wait_time, episode_length, seed=None):
+                 max_wait_time, episode_length, hospital_capacities, seed=None):
 
         # For testing consistency
         self.seed = seed
@@ -20,12 +20,7 @@ class HCRA:
         self.episode_length = episode_length
 
         # Initialize hospitals with capacities
-        self.hospital_capacities = {
-            0: {'max_patients': 20, 'max_specialists': 10},  # Largest hospital
-            1: {'max_patients': 15, 'max_specialists': 7},
-            2: {'max_patients': 10, 'max_specialists': 5},
-            3: {'max_patients': 5,  'max_specialists': 3},   # Smallest hospital
-        }
+        self.hospital_capacities = hospital_capacities
 
         # Initialize data structures
         self.patients = []
@@ -182,16 +177,32 @@ class HCRA:
 
         # Process summary information
         summary_info = observation['summary_info']
+        total_patients = summary_info['total_patients']
+        average_wait_time = summary_info['average_wait_time']
+        total_capacity = summary_info['total_capacity']
+        average_utilization = summary_info['average_utilization']
+
+        # Check for Nan and inf
+        if not np.isfinite(average_wait_time):
+            average_wait_time = 0.0
+        if not np.isfinite(average_utilization):
+            average_utilization = 0.0
+
         summary_features = np.array([
-            summary_info['total_patients'],
-            summary_info['average_wait_time'],
-            summary_info['total_capacity'],
-            summary_info['average_utilization']
+            total_patients,
+            average_wait_time,
+            total_capacity,
+            average_utilization
         ])
 
         # Combine features
         observation_vector = np.concatenate([patient_features, specialist_features, summary_features])
+
+        # Replace any NaN or inf values with 0.0
+        observation_vector = np.nan_to_num(observation_vector, nan=0.0, posinf=0.0, neginf=0.0)
+
         return observation_vector
+
 
     @staticmethod
     def process_global_state(global_state_raw, max_patients, max_specialists, num_specialties):
@@ -203,6 +214,7 @@ class HCRA:
             hospital_one_hot = np.eye(global_state_raw['num_hospitals'])[hospital_id]
             patient_feature = np.concatenate([condition_one_hot, [wait_time], hospital_one_hot])
             patient_features.append(patient_feature)
+        
         # Pad or truncate to max_patients
         while len(patient_features) < max_patients:
             patient_features.append(np.zeros(num_specialties + 1 + global_state_raw['num_hospitals']))
@@ -217,6 +229,7 @@ class HCRA:
             hospital_one_hot = np.eye(global_state_raw['num_hospitals'])[hospital_id]
             specialist_feature = np.concatenate([specialty_one_hot, available_flag, hospital_one_hot])
             specialist_features.append(specialist_feature)
+        
         # Pad or truncate to max_specialists
         while len(specialist_features) < max_specialists:
             specialist_features.append(np.zeros(num_specialties + 1 + global_state_raw['num_hospitals']))
@@ -224,17 +237,29 @@ class HCRA:
 
         # Process hospital queues
         hospital_queue_lengths = np.array(list(global_state_raw['hospital_queues'].values()))
+        
+        # Check for NaN and inf
+        if np.isnan(hospital_queue_lengths).any():
+            hospital_queue_lengths = np.nan_to_num(hospital_queue_lengths, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Combine all features
         global_state_vector = np.concatenate([patient_features, specialist_features, hospital_queue_lengths])
+
+        # Replace any NaNs or inf values with 0.0
+        global_state_vector = np.nan_to_num(global_state_vector, nan=0.0, posinf=0.0, neginf=0.0)
+
         return global_state_vector
 
-    def reset(self):
+
+    def reset(self, seed=None):
         self.current_step = 0
+        if seed is not None:
+            self.seed = seed
         if self.seed is not None:
             random.seed(self.seed)
             np.random.seed(self.seed)
             th.manual_seed(self.seed)
+
         self.patients = []
         self.specialists = []
         for h_id in self.hospitals:
@@ -289,7 +314,7 @@ class HCRA:
                     # Patient is no longer in any hospital queue
 
                     # Base reward
-                    base_reward = 1.5
+                    base_reward = 1.0
 
                     # Additional reward for reducing wait time
                     wait_time_reward = 1 - (patient_in_queue['wait_time'] / self.max_wait_time)
@@ -297,11 +322,7 @@ class HCRA:
                     # Total reward
                     rewards[agent_id] += base_reward + wait_time_reward
                 else:
-                    # Penalty for invalid assignment
-                    if specialist['specialty_type'] != patient['condition_type']:
-                        rewards[agent_id] -= 2.0  # Larger penalty for mismatched specialty
-                    else:
-                        rewards[agent_id] -= 0.5  # Penalty for other invalid assignment reasons
+                    rewards[agent_id] -= 1.0  # Penalty for mismatched specialty or other
 
             elif action_type == 'transfer':
                 patient_id, target_hospital_id = action_details
@@ -377,12 +398,21 @@ class HCRA:
         ]
 
         # Summary statistics (limited global information)
-        total_patients = sum(len(hospital['queue']) for hospital in self.hospitals.values())
-        average_wait_time = np.mean([
-            patient['wait_time'] for hospital in self.hospitals.values() for patient in hospital['queue']
-        ])
+        all_queues = [patient for hosp in self.hospitals.values() for patient in hosp['queue']]
+        wait_times = [patient['wait_time'] for patient in all_queues]
+
+        if len(wait_times) > 0:
+            average_wait_time = np.mean(wait_times)
+        else:
+            average_wait_time = 0.0  # Default value if no patients are waiting
+
+        total_patients = len(all_queues)
         total_capacity = sum(self.hospital_capacities[h_id]['max_patients'] for h_id in self.hospitals)
-        average_utilization = total_patients / total_capacity
+
+        if total_capacity > 0:
+            average_utilization = total_patients / total_capacity
+        else:
+            average_utilization = 0.0  # Avoid division by zero if total_capacity is 0
 
         summary_info = {
             'total_patients': total_patients,
@@ -398,7 +428,9 @@ class HCRA:
             'hospital_id': hospital_id,
             'summary_info': summary_info
         }
+
         return observation
+
 
     def get_global_state(self):
         state = {

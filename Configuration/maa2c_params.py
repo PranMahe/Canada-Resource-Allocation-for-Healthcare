@@ -6,8 +6,8 @@ class MAA2Cparameters:
         self.num_trials = 5
         self.training_episodes = 100000
         self.batch_size = 8
-        self.alpha = 0.0001
-        self.beta = 0.0001
+        self.alpha = 0.001
+        self.beta = 0.001
         self.actor_hidden_dim = 128
         self.critic_hidden_dim = 128
         self.gamma = 0.99

@@ -40,13 +40,19 @@ class BatchTraining:
             batch_actions.append(episode_actions_tensor)
 
             # Stack returns: [timesteps]
-            episode_rtrns_tensor = th.tensor(episode_rtrns, dtype=th.float32).to(device)   # Shape: [timesteps]
+            episode_rtrns_np = np.stack(episode_rtrns, axis=0)
+            episode_rtrns_tensor = th.from_numpy(episode_rtrns_np).to(device)   # Shape: [timesteps]
             batch_rtrns_list.append(episode_rtrns_tensor)
 
         # Stack over episodes to create batch tensors
         batch_global_states = th.stack(batch_global_states).to(device) # Shape: [batch_size, timesteps, state_dim]
         batch_observations = th.stack(batch_observations).to(device)  # Shape: [batch_size, timesteps, num_agents, observation_dim]
         batch_actions = th.stack(batch_actions).to(device)  # Shape: [batch_size, timesteps, num_agents]
-        batch_rtrns = th.stack(batch_rtrns_list).to(device)  # Shape: [batch_size, timesteps]
+        batch_rtrns = th.stack(batch_rtrns_list).to(device)  # Shape: [batch_size, timesteps, num_agents]
         
+        # Final Checks
+        if th.isnan(batch_rtrns).any():
+            print("NaN detected in batch_rtrns during collation.")
+            raise ValueError("NaN detected in batch_rtrns during collation.")
+
         return batch_global_states, batch_observations, batch_actions, batch_rtrns

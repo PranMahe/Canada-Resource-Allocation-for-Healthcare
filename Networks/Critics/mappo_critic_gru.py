@@ -2,9 +2,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Critic(nn.Module):
-    def __init__(self, state_dim, action_size, hidden_size, value_dim, num_agents):
+    def __init__(self, state_dim, observation_dim, action_size, hidden_size, value_dim, num_agents):
         super(Critic, self).__init__()
-        self.fc1 = nn.Linear(state_dim + num_agents + action_size * num_agents, hidden_size)
+        self.fc1 = nn.Linear(state_dim + observation_dim + num_agents + action_size * num_agents, hidden_size)
         self.gru = nn.GRU(hidden_size, hidden_size, batch_first=True)
         self.fc3 = nn.Linear(hidden_size, value_dim)
         self.initialize_weights()
