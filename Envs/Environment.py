@@ -34,8 +34,8 @@ class HCRA:
         self._initialize_agent_hospital_mapping()
         self._initialize_dimensions()
 
+    # Assign agents to hospitals based on predefined mapping
     def _initialize_agent_hospital_mapping(self):
-        # Assign agents to hospitals based on predefined mapping
         self.agent_hospital_mapping = {
             0: 0,  # Agent 0 assigned to Hospital 0 (largest)
             1: 1,  # Agent 1 assigned to Hospital 1
@@ -43,6 +43,7 @@ class HCRA:
             3: 3,  # Agent 3 assigned to Hospital 3 (smallest)
         }
 
+    # Initializing action, observation, global state dimensions for neural networks
     def _initialize_dimensions(self):
         # Initialize action mapping
         self.action_mapping = self.create_action_mapping(
@@ -73,6 +74,7 @@ class HCRA:
         )
         self.state_dim = len(sample_global_state_vector)
 
+    # Setting up hospital information for agents
     def _initialize_hospitals(self):
         for h_id in range(self.num_hospitals):
             self.hospitals[h_id] = {
@@ -81,6 +83,7 @@ class HCRA:
                 'queue': []
             }
 
+    # Assigning specialist information using the number of available specialists
     def _initialize_specialists(self):
         specialist_ids = list(range(self.num_specialists))
         random.shuffle(specialist_ids)
@@ -104,6 +107,7 @@ class HCRA:
                 self.hospitals[h_id]['specialists'].append(specialist)
                 specialist_index += 1
 
+    # Assigning patient information using the number of available patients
     def _initialize_patients(self):
         patient_ids = list(range(self.num_patients))
         random.shuffle(patient_ids)
@@ -126,12 +130,14 @@ class HCRA:
                 self.hospitals[h_id]['queue'].append(patient)
                 patient_index += 1
 
+    # Randomization of the environment
     def _initialize_random_seed(self):
         if self.seed is not None:
             random.seed(self.seed)
             np.random.seed(self.seed)
             th.manual_seed(self.seed)
 
+    # Maps actions from raw action form to environment freindly mapped form
     @staticmethod
     def create_action_mapping(num_patients, num_specialists, num_hospitals):
         action_mapping = {}
@@ -148,6 +154,7 @@ class HCRA:
                 action_counter += 1
         return action_mapping
 
+    # Helper for converting raw observation information into readable vector
     @staticmethod
     def process_observation(observation, max_patients_per_hospital, max_specialists_per_hospital, num_specialties):
         # Process patients
@@ -203,7 +210,7 @@ class HCRA:
 
         return observation_vector
 
-
+    # Helper for converting raw global state information into readable vector 
     @staticmethod
     def process_global_state(global_state_raw, max_patients, max_specialists, num_specialties):
         # Process patients
@@ -250,7 +257,7 @@ class HCRA:
 
         return global_state_vector
 
-
+    # Reset the HCRA environment
     def reset(self, seed=None):
         self.current_step = 0
         if seed is not None:
@@ -269,6 +276,7 @@ class HCRA:
         self._initialize_patients()
         return self.get_global_state()
 
+    # Main environment step function
     def step(self, actions):
         rewards = np.zeros(self.num_agents)
         done = False
@@ -381,7 +389,7 @@ class HCRA:
         global_reward = np.sum(rewards)
         return global_reward, rewards, done
 
-
+    # Get raw observation information
     def get_observation(self, agent_id):
         # Local observations
         hospital_id = self.agent_hospital_mapping[agent_id]
@@ -431,7 +439,7 @@ class HCRA:
 
         return observation
 
-
+    # Get raw global state information
     def get_global_state(self):
         state = {
             'patients': [(patient['condition_type'], patient['wait_time'], patient['hospital_id']) for patient in self.patients],
@@ -441,12 +449,15 @@ class HCRA:
         }
         return state
 
+    # Helper for patient ID
     def _get_patient_by_id(self, patient_id):
         return next((patient for patient in self.patients if patient['patient_id'] == patient_id), None)
 
+    # Helper for specialist ID
     def _get_specialist_by_id(self, specialist_id):
         return next((specialist for specialist in self.specialists if specialist['specialist_id'] == specialist_id), None)
 
+    # Rendering info for debugging
     def render(self):
         print(f"Step: {self.current_step}")
         print("Patients:")
