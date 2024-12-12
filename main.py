@@ -3,7 +3,7 @@ import os
 
 # Import envs and runners here
 from Configuration.env_params import HCRAparams
-from Envs.Environment import *
+from Envs.Environment import HCRA
 from Runners.maa2c_runner_po import MAA2CrunnerPO
 from Runners.mappo_runner_po import MAPPOrunnerPO
 from Results.Plotting.benchmark_plot import benchmark_plot_from_csv, plot_mean_test_returns_comparison
