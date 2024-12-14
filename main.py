@@ -38,7 +38,7 @@ def main():
 
     # Create the environment
     # You can set environment hyperparameters here
-    # More environements can be added here
+    # More environements can be added here - planned to other environments, but didn't seem necassary from the results
     if args.env is not None and args.algo is not None:
         if args.env == 'HCRA': # Partial Observable
             env_params = HCRAparams()
