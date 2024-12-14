@@ -385,7 +385,7 @@ class HCRA:
         if self.current_step >= self.episode_length:
             done = True
 
-        # Global reward could be adjusted based on overall performance
+        # Global reward is the sum of all agents individual rewards
         global_reward = np.sum(rewards)
         return global_reward, rewards, done
 
@@ -405,7 +405,7 @@ class HCRA:
             (specialist['specialty_type'], specialist['available']) for specialist in hospital['specialists']
         ]
 
-        # Summary statistics (limited global information)
+        # Summary statistics (limited global information to adhere to partial observability)
         all_queues = [patient for hosp in self.hospitals.values() for patient in hosp['queue']]
         wait_times = [patient['wait_time'] for patient in all_queues]
 
